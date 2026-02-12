@@ -1,0 +1,56 @@
+pipeline {
+    agent any
+    tools {
+         nodejs 'nodejs25'
+    }
+    
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    }
+    stages {
+        stage('Git checkout') {
+            steps {
+                git branch: 'local-dev', url: 'https://github.com/dina0062/3-Tier-DevSecOps-Mega-Project.git'
+            }
+        }
+        stage('Frontend compilation') {
+            steps {
+                dir('client') {
+                     sh 'find . -name "*.js" -exec node --check {} +'
+                }
+            }
+        }
+        
+        stage('backend compilation') {
+            steps {
+                dir('api') {
+                     sh 'find . -name "*.js" -exec node --check {} +'
+                }
+            }
+        }
+        
+        
+        stage('Sonar qube') {
+            steps {
+                withSonarQubeEnv('sonar') {
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=NodeJS-PROJECT \
+                    -Dsonar.projectKey=NodeJS-project '''
+                }
+            }
+        }
+        
+        stage('Quality Gate Check') {
+            steps {
+                timeout(1) {
+                  waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                }
+            }
+        }
+        
+        stage('trivy') {
+            steps {
+               sh 'trivy fs --format table -o fs-report.html .'
+            }
+        }
+    }
+}
